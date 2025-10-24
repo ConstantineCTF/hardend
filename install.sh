@@ -32,34 +32,28 @@ check_requirements() {
     if ! command -v go &> /dev/null; then
         echo -e "${RED}Error: Go compiler not found${NC}"
         echo "Please install Go 1.25+ from https://golang.org/dl/"
-        exit 1
+        return 1
     fi
 
     # Check Go version
-    GO_VERSION=$(go version | grep -oP 'go\d+\.\d+' | grep -oP '\d+\.\d+')
+    GO_VERSION=$(go version | grep -oE 'go[0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+')
     REQUIRED_VERSION="1.25"
 
-    if [[ $(echo "$GO_VERSION >= $REQUIRED_VERSION" | bc -l 2>/dev/null || echo "0") -eq 0 ]]; then
+    # Use built-in bash comparison instead of bc
+    if ! awk -v ver="$GO_VERSION" -v req="$REQUIRED_VERSION" 'BEGIN {
+        split(ver, v, ".");
+        split(req, r, ".");
+        v_major = v[1] + 0; v_minor = v[2] + 0;
+        r_major = r[1] + 0; r_minor = r[2] + 0;
+        if (v_major < r_major || (v_major == r_major && v_minor < r_minor)) exit 1
+    }'; then
         echo -e "${RED}Error: Go version $GO_VERSION insufficient${NC}"
         echo "Require Go $REQUIRED_VERSION or higher"
-        exit 1
+        return 1
     fi
 
     echo -e "${GREEN}Go $GO_VERSION detected - ready to build${NC}"
-}
-
-# Install dependencies
-install_dependencies() {
-    echo -e "${GREEN}Installing dependencies...${NC}"
-
-    if [[ -f "go.mod" ]]; then
-        go mod download
-        echo "Dependencies installed successfully"
-    else
-        echo -e "${RED}Error: go.mod not found${NC}"
-        echo "Please run from the project directory"
-        exit 1
-    fi
+    return 0
 }
 
 # Build the application
